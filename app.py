@@ -42,16 +42,25 @@ if option == "Enter Text Reviews":
 elif option == "Upload CSV File":
     uploaded_file = st.file_uploader("Upload CSV (must contain a column named 'Review Text' or 'review'):", type=["csv"])
     if uploaded_file is not None:
-        df_uploaded = pd.read_csv(uploaded_file)
-        col_name = None
-        for col in df_uploaded.columns:
-            if "review" in col.lower() or "text" in col.lower():
-                col_name = col
-                break
-        if col_name:
-            reviews_list = df_uploaded[col_name].dropna().tolist()
-        else:
-            st.error("Could not find a review column in the uploaded CSV. Please check column headers.")
+        try:
+            # Robust CSV reading to handle parsing errors & bad lines
+            try:
+                df_uploaded = pd.read_csv(uploaded_file, on_bad_lines='skip', encoding='utf-8')
+            except Exception:
+                df_uploaded = pd.read_csv(uploaded_file, on_bad_lines='skip', encoding='latin1')
+
+            col_name = None
+            for col in df_uploaded.columns:
+                if "review" in col.lower() or "text" in col.lower():
+                    col_name = col
+                    break
+            
+            if col_name:
+                reviews_list = df_uploaded[col_name].dropna().tolist()
+            else:
+                st.error("Could not find a review column in the uploaded CSV. Please make sure your CSV has a column like 'Review Text' or 'review'.")
+        except Exception as e:
+            st.error(f"Error reading CSV file: {e}")
 
 # Run Analysis
 if reviews_list:
@@ -96,7 +105,7 @@ if reviews_list:
 
     with col_cloud:
         st.subheader("Word Cloud")
-        all_text = " ".join(df_results["Review Text"].tolist())
+        all_text = " ".join(df_results["Review Text"].astype(str).tolist())
         if all_text.strip():
             wordcloud = WordCloud(width=600, height=400, background_color="white").generate(all_text)
             fig_wc, ax = plt.subplots(figsize=(6, 4))
